@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Investment Growth Calculator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .calculator {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        #chartContainer {
+            margin-top: 20px;
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <h2>Investment Growth Calculator</h2>
+        
+        <div class="input-group">
+            <label for="initialContribution">Initial Monthly Contribution (ZAR)</label>
+            <input type="number" id="initialContribution" value="500">
+            
+            <label for="annualIncrease">Annual Increase Rate (%)</label>
+            <input type="number" id="annualIncrease" value="10">
+            
+            <label for="annualGrowth">Annual Growth Rate (%)</label>
+            <input type="number" id="annualGrowth" value="12.4">
+            
+            <label for="years">Investment Duration (Years)</label>
+            <input type="number" id="years" value="5">
+            
+            <button onclick="calculateInvestment()">Calculate</button>
+        </div>
+        
+        <div class="results">
+            <h3>Projected Value: <span id="projectedValue">R 0.00</span></h3>
+            <p>Total Contributions: <span id="totalContributions">R 0.00</span></p>
+            <p>Investment Growth: <span id="investmentGrowth">R 0.00</span></p>
+        </div>
+        
+        <canvas id="growthChart"></canvas>
+    </div>
+
+    <script>
+        let chart = null;
+
+        function calculateInvestment() {
+            const initialContribution = parseFloat(document.getElementById('initialContribution').value);
+            const annualIncrease = 1 + (parseFloat(document.getElementById('annualIncrease').value) / 100);
+            const annualGrowth = parseFloat(document.getElementById('annualGrowth').value) / 100;
+            const years = parseInt(document.getElementById('years').value);
+            const monthsPerYear = 12;
+            const monthlyGrowth = Math.pow(1 + annualGrowth, 1/12) - 1;
+            
+            let projectedValue = 0;
+            let totalContributions = 0;
+            const yearlyData = [];
+            
+            for (let year = 1; year <= years; year++) {
+                const monthlyContribution = initialContribution * Math.pow(annualIncrease, year - 1);
+                const remainingMonths = (years - year + 1) * monthsPerYear;
+                
+                const futureValueYearly = monthlyContribution * 
+                    (Math.pow(1 + monthlyGrowth, remainingMonths) - 1) / monthlyGrowth;
+                
+                projectedValue += futureValueYearly;
+                totalContributions += monthlyContribution * 12;
+                
+                // Calculate cumulative value for this year
+                const yearlyValue = calculateCumulativeValue(
+                    initialContribution,
+                    annualIncrease,
+                    monthlyGrowth,
+                    year
+                );
+                yearlyData.push({
+                    year: year,
+                    value: yearlyValue
+                });
+            }
+            
+            // Update results
+            document.getElementById('projectedValue').textContent = 
+                `R ${projectedValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('totalContributions').textContent = 
+                `R ${totalContributions.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('investmentGrowth').textContent = 
+                `R ${(projectedValue - totalContributions).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            
+            updateChart(yearlyData);
+        }
+        
+        function calculateCumulativeValue(initialContribution, annualIncrease, monthlyGrowth, upToYear) {
+            let cumulativeValue = 0;
+            for (let month = 1; month <= upToYear * 12; month++) {
+                const yearNumber = Math.ceil(month / 12);
+                const monthlyContribution = initialContribution * Math.pow(annualIncrease, yearNumber - 1);
+                cumulativeValue = (cumulativeValue + monthlyContribution) * (1 + monthlyGrowth);
+            }
+            return cumulativeValue;
+        }
+        
+        function updateChart(yearlyData) {
+            const ctx = document.getElementById('growthChart').getContext('2d');
+            
+            if (chart) {
+                chart.destroy();
+            }
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: yearlyData.map(d => `Year ${d.year}`),
+                    datasets: [{
+                        label: 'Investment Value',
+                        data: yearlyData.map(d => d.value),
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Investment Growth Over Time'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: value => 'R ' + value.toLocaleString()
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Initial calculation
+        calculateInvestment();
+    </script>
+</body>
+</html>
